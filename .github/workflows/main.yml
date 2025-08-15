@@ -24,65 +24,70 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Setup Node + cache for the detected package manager
-      - name: Use Node ${{ matrix.node }} (npm cache)
-        if: hashFiles('**/package-lock.json') != ''
+      # Detect package manager by lockfile (supports nested workspaces/monorepos)
+      - name: Detect package manager
+        id: pm
+        shell: bash
+        run: |
+          if git ls-files -- **/pnpm-lock.yaml | grep -q .; then
+            echo "manager=pnpm" >> $GITHUB_OUTPUT
+          elif git ls-files -- **/yarn.lock | grep -q .; then
+            echo "manager=yarn" >> $GITHUB_OUTPUT
+          elif git ls-files -- **/package-lock.json | grep -q .; then
+            echo "manager=npm" >> $GITHUB_OUTPUT
+          else
+            echo "No lockfile detected; defaulting to npm"
+            echo "manager=npm" >> $GITHUB_OUTPUT
+          fi
+
+      # Setup Node + cache for the detected manager
+      - name: Setup Node ${{ matrix.node }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
+          cache: ${{ steps.pm.outputs.manager }}
+          # Support monorepos by checking all possible lockfile locations
+          cache-dependency-path: |
+            **/pnpm-lock.yaml
+            **/yarn.lock
+            **/package-lock.json
 
-      - name: Use Node ${{ matrix.node }} (pnpm cache)
-        if: hashFiles('**/pnpm-lock.yaml') != ''
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: pnpm
-
-      - name: Use Node ${{ matrix.node }} (yarn cache)
-        if: hashFiles('**/yarn.lock') != ''
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: yarn
-
+      # Install the package manager if needed
       - name: Set up pnpm
-        if: hashFiles('**/pnpm-lock.yaml') != ''
+        if: ${{ steps.pm.outputs.manager == 'pnpm' }}
         uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      # Install deps
-      - name: Install (pnpm)
-        if: hashFiles('**/pnpm-lock.yaml') != ''
-        run: pnpm install --frozen-lockfile
+      # Install deps using the detected manager (repo root)
+      # If your actual project lives in a subfolder, add "working-directory:"
+      - name: Install dependencies
+        run: |
+          if [ "${{ steps.pm.outputs.manager }}" = "pnpm" ]; then
+            pnpm install --frozen-lockfile
+          elif [ "${{ steps.pm.outputs.manager }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci
+          fi
 
-      - name: Install (npm)
-        if: hashFiles('**/package-lock.json') != ''
-        run: npm ci
-
-      - name: Install (yarn)
-        if: hashFiles('**/yarn.lock') != ''
-        run: yarn install --frozen-lockfile
-
-      # Optional: Type-check if there's a tsconfig
-      - name: Type check (tsc)
+      # Optional type-check, only if tsconfig.json exists
+      - name: Type check
         run: |
           if [ -f tsconfig.json ]; then
             npx tsc -p . --noEmit
           else
-            echo "No tsconfig.json; skipping type check."
+            echo "No tsconfig.json; skipping."
           fi
 
       # Run tests (expects a "test" script in package.json)
       - name: Test
         env:
-          # Optional: override the API base if you don't want the default
-          BASE_URL: ${{ secrets.BASE_URL }}
+          BASE_URL: ${{ secrets.BASE_URL }} # optional override
         run: |
-          if [ -f pnpm-lock.yaml ]; then
+          if [ "${{ steps.pm.outputs.manager }}" = "pnpm" ]; then
             pnpm test
-          elif [ -f yarn.lock ]; then
+          elif [ "${{ steps.pm.outputs.manager }}" = "yarn" ]; then
             yarn test
           else
             npm test --if-present
