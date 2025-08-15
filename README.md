@@ -8,7 +8,7 @@ TypeScript edition of the tiny API test suite. Same tests as the JS version, but
 - **Data integrity**
 - **Robustness** (handling unexpected input)
 
-## 🛠️ Setup
+## Setup
 
 **Prereqs**
 - Node.js 18+
@@ -30,7 +30,7 @@ BASE_URL=https://jsonplaceholder.typicode.com npm test
 ```
 If `BASE_URL` is not set, tests default to `https://jsonplaceholder.typicode.com`.
 
-## 📂 Project structure
+## Project structure
 
 ```
 .
