@@ -43,4 +43,4 @@ If `BASE_URL` is not set, tests default to `https://jsonplaceholder.typicode.com
 ## Notes
 - Uses **ts-jest** to transpile TypeScript on the fly.
 - Uses **axios** for HTTP and **zod** for schema validation.
-- JSONPlaceholder is a mock API; write operations are faked (expected).
+- JSONPlaceholder is a mock API.
