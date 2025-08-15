@@ -2,7 +2,7 @@
 
 **Base URL:** `https://jsonplaceholder.typicode.com`
 
-TypeScript edition of the tiny API test suite. Same tests as the JS version, but with types.
+This mini project includes a tiny Jest test suite in TypeScript that hits a few JSONPlaceholder endpoints and checks:
 
 - **Correctness of responses**
 - **Data integrity**
