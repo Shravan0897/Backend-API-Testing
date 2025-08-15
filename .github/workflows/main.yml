@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Setup Node + cache for the detected package manager
+      - name: Use Node ${{ matrix.node }} (npm cache)
+        if: hashFiles('**/package-lock.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Use Node ${{ matrix.node }} (pnpm cache)
+        if: hashFiles('**/pnpm-lock.yaml') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Use Node ${{ matrix.node }} (yarn cache)
+        if: hashFiles('**/yarn.lock') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: yarn
+
+      - name: Set up pnpm
+        if: hashFiles('**/pnpm-lock.yaml') != ''
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # Install deps
+      - name: Install (pnpm)
+        if: hashFiles('**/pnpm-lock.yaml') != ''
+        run: pnpm install --frozen-lockfile
+
+      - name: Install (npm)
+        if: hashFiles('**/package-lock.json') != ''
+        run: npm ci
+
+      - name: Install (yarn)
+        if: hashFiles('**/yarn.lock') != ''
+        run: yarn install --frozen-lockfile
+
+      # Optional: Type-check if there's a tsconfig
+      - name: Type check (tsc)
+        run: |
+          if [ -f tsconfig.json ]; then
+            npx tsc -p . --noEmit
+          else
+            echo "No tsconfig.json; skipping type check."
+          fi
+
+      # Run tests (expects a "test" script in package.json)
+      - name: Test
+        env:
+          # Optional: override the API base if you don't want the default
+          BASE_URL: ${{ secrets.BASE_URL }}
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm test
+          elif [ -f yarn.lock ]; then
+            yarn test
+          else
+            npm test --if-present
+          fi
