@@ -43,14 +43,16 @@ describe('JSONPlaceholder sample tests', () => {
     });
   });
 
-  it('handles missing resources and odd POST payloads', async () => {
+  it('handles missing resources', async () => {
     const missing = await api.get('/posts/999999', { validateStatus: () => true });
+    console.log('GET /posts/999999 ->', missing.status, missing.data)
     expect([200, 404]).toContain(missing.status);
     if (missing.status === 200) {
       expect(Object.keys(missing.data ?? {}).length).toBe(0);
     }
-
+    // Weird POST payload still returns 201 with an id 
     const created = await api.post('/posts', { foo: 'bar', baz: 42 });
+    console.log("new created id ->", created.data?.id)
     expect(created.status).toBe(201);
     expect(created.data).toHaveProperty('id');
   });
